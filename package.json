@@ -1,0 +1,17 @@
+{
+  "name": "fastify-todo",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "fastify start -w -o -l debug -P app.cjs",
+    "start": "fastify start -o -l info -a 0.0.0.0 app.cjs"
+  },
+  "dependencies": {
+    "@fastify/autoload": "^6.3.1",
+    "@fastify/cors": "^11.0.1",
+    "@fastify/env": "^5.0.2",
+    "@fastify/mongodb": "^9.0.2",
+    "fastify": "^5.4.0",
+    "fastify-cli": "^7.4.0",
+    "fastify-plugin": "^5.0.1"
+  }
+}
