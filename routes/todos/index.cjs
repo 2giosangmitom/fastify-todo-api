@@ -1,3 +1,5 @@
+'use strict';
+
 /** @type {import("fastify").FastifyPluginAsync} */
 module.exports = async function todoRoutes(fastify, _opts) {
   const todos = fastify.mongo.db.collection('todos');
@@ -22,7 +24,7 @@ module.exports = async function todoRoutes(fastify, _opts) {
     return { id: _id };
   });
 
-  fastify.get('/', async function listTodo(request, reply) {
+  fastify.get('/', async function listTodo(request, _reply) {
     const { skip, limit, title } = request.query;
     const filter = title ? { title: new RegExp(title, 'i') } : {};
     const data = await todos.find(filter, { limit, skip }).toArray();
