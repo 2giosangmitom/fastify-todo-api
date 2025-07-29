@@ -28,9 +28,11 @@ module.exports = async function (fastify, opts) {
   // Load routes
   fastify.register(FastifyAutoLoad, {
     dir: path.join(__dirname, 'routes'),
-    options: opts,
     autoHooks: true,
     autoHooksPattern: /.*\.hooks\.cjs$/i,
-    ignorePattern: /.*\.no-load\.cjs$/i
+    cascadeHooks: true,
+    ignorePattern: /.*\.cjs$/i,
+    indexPattern: /.*routes\.cjs$/i,
+    options: opts
   });
 };
