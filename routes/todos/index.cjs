@@ -33,4 +33,74 @@ module.exports = async function todoRoutes(fastify, _opts) {
 
     return { data, totalCount };
   });
+
+  fastify.get('/:id', async function readTodo(request, reply) {
+    const todo = await todos.findOne(
+      { _id: this.mongo.ObjectId.createFromHexString(request.params.id) },
+      { projection: { _id: 0 } }
+    );
+
+    if (!todo) {
+      reply.code(404);
+      return { error: 'Todo not found' };
+    }
+
+    return todo;
+  });
+
+  fastify.put('/:id', async function updateTodo(request, reply) {
+    const res = await todos.updateOne(
+      {
+        _id: this.mongo.ObjectId.createFromHexString(request.params.id)
+      },
+      {
+        $set: {
+          ...request.body,
+          modifiedAt: new Date()
+        }
+      }
+    );
+
+    if (res.modifiedCount === 0) {
+      reply.code(404);
+      return { error: 'Todo not found' };
+    }
+
+    reply.code(204);
+  });
+
+  fastify.delete('/:id', async function deleteTodo(request, reply) {
+    const res = await todos.deleteOne({
+      _id: this.mongo.ObjectId.createFromHexString(request.params.id)
+    });
+
+    if (res.deletedCount === 0) {
+      reply.code(404);
+      return { error: 'Todo not found' };
+    }
+
+    reply.code(204);
+  });
+
+  fastify.post('/:id/:status', async function changeStatus(request, reply) {
+    const done = request.params.status === 'done';
+    const res = await todos.updateOne(
+      {
+        _id: this.mongo.ObjectId.createFromHexString(request.params.id)
+      },
+      {
+        $set: {
+          done,
+          modifiedAt: new Date()
+        }
+      }
+    );
+
+    if (res.modifiedCount === 0) {
+      reply.code(404);
+      return { error: 'Todo not found' };
+    }
+
+    reply.code(204);
+  });
 };
