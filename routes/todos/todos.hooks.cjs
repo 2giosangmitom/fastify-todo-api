@@ -73,18 +73,20 @@ module.exports = fp(async function todoAutoHooks(fastify, _opts) {
           };
         });
         await todos.insertMany(toInsert);
-        return toInsert.map((todo) => todo._id);
+        return toInsert.map((todo) => ({
+          id: todo._id
+        }));
       },
       async readTodo(id, projection = {}) {
         const todo = await todos.findOne(
-          { _id: new fastify.mongo.ObjectId.createFromHexString(id), userId: request.user.id },
+          { _id: fastify.mongo.ObjectId.createFromHexString(id), userId: request.user.id },
           { projection: { ...projection, _id: 0 } }
         );
         return todo;
       },
       async updateTodo(id, newTodo) {
         return todos.updateOne(
-          { _id: new fastify.mongo.ObjectId.createFromHexString(id), userId: request.user.id },
+          { _id: fastify.mongo.ObjectId.createFromHexString(id), userId: request.user.id },
           {
             $set: {
               ...newTodo,
@@ -95,7 +97,7 @@ module.exports = fp(async function todoAutoHooks(fastify, _opts) {
       },
       async deleteTodo(id) {
         return todos.deleteOne({
-          _id: new fastify.mongo.ObjectId.createFromHexString(id),
+          _id: fastify.mongo.ObjectId.createFromHexString(id),
           userId: request.user.id
         });
       }

@@ -11,4 +11,5 @@ module.exports = fp(async function todoSchemaLoader(fastify, _opts) {
   fastify.addSchema(require('./read-params.json'));
   fastify.addSchema(require('./update-body.json'));
   fastify.addSchema(require('./todo.json'));
+  fastify.addSchema(require('./list-export.json'));
 });
