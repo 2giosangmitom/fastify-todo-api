@@ -2,6 +2,8 @@
 
 /** @type {import("fastify").FastifyPluginAsync} */
 module.exports = async function todoRoutes(fastify, _opts) {
+  fastify.addHook('onRequest', fastify.authenticate);
+
   fastify.post(
     '/',
     {
@@ -13,7 +15,7 @@ module.exports = async function todoRoutes(fastify, _opts) {
       }
     },
     async function createTodo(request, reply) {
-      const insertedId = await this.mongoDataSource.createTodo(request.body);
+      const insertedId = await request.todosDataSource.createTodo(request.body);
       reply.code(201);
       return { id: insertedId };
     }
@@ -23,11 +25,17 @@ module.exports = async function todoRoutes(fastify, _opts) {
     '/',
     {
       schema: {
-        params: fastify.getSchema('schema:todo:list:query')
+        querystring: fastify.getSchema('schema:todo:list:query'),
+        response: {
+          200: fastify.getSchema('schema:todo:list:response')
+        }
       }
     },
     async function listTodo(request, _reply) {
-      return this.mongoDataSource.listTodo(request.query);
+      const { skip, limit, title } = request.query;
+      const todos = await request.todosDataSource.listTodos({ filter: { title }, skip, limit });
+      const totalCount = await request.todosDataSource.countTodos();
+      return { data: todos, totalCount };
     }
   );
 
@@ -35,17 +43,18 @@ module.exports = async function todoRoutes(fastify, _opts) {
     '/:id',
     {
       schema: {
-        params: fastify.getSchema('schema:todo:read:params')
+        params: fastify.getSchema('schema:todo:read:params'),
+        response: {
+          200: fastify.getSchema('schema:todo')
+        }
       }
     },
     async function readTodo(request, reply) {
-      const todo = await this.mongoDataSource.readTodo(request.params);
-
+      const todo = await request.todosDataSource.readTodo(request.params.id);
       if (!todo) {
         reply.code(404);
         return { error: 'Todo not found' };
       }
-
       return todo;
     }
   );
@@ -54,16 +63,13 @@ module.exports = async function todoRoutes(fastify, _opts) {
     '/:id',
     {
       schema: {
-        body: fastify.getSchema('schema:todo:update:body')
+        body: fastify.getSchema('schema:todo:update:body'),
+        params: fastify.getSchema('schema:todo:read:params')
       }
     },
     async function updateTodo(request, reply) {
-      const modifiedCount = await this.mongoDataSource.updateTodo({
-        id: request.params.id,
-        data: request.body
-      });
-
-      if (modifiedCount === 0) {
+      const res = await request.todosDataSource.updateTodo(request.params.id, request.body);
+      if (res.modifiedCount === 0) {
         reply.code(404);
         return { error: 'Todo not found' };
       }
@@ -80,13 +86,11 @@ module.exports = async function todoRoutes(fastify, _opts) {
       }
     },
     async function deleteTodo(request, reply) {
-      const deletedCount = await this.mongoDataSource.deleteTodo(request.params);
-
-      if (deletedCount === 0) {
+      const res = await request.todosDataSource.deleteTodo(request.params.id);
+      if (res.deletedCount === 0) {
         reply.code(404);
         return { error: 'Todo not found' };
       }
-
       reply.code(204);
     }
   );
@@ -99,9 +103,10 @@ module.exports = async function todoRoutes(fastify, _opts) {
       }
     },
     async function changeStatus(request, reply) {
-      const modifiedCount = await this.mongoDataSource.changeStatus(request.params);
-
-      if (modifiedCount === 0) {
+      const res = await request.todosDataSource.updateTodo(request.params.id, {
+        done: request.params.status === 'done'
+      });
+      if (res.modifiedCount === 0) {
         reply.code(404);
         return { error: 'Todo not found' };
       }

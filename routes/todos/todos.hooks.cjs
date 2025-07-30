@@ -8,72 +8,97 @@ module.exports = fp(async function todoAutoHooks(fastify, _opts) {
 
   const todos = fastify.mongo.db.collection('todos');
 
-  fastify.decorate('mongoDataSource', {
-    async createTodo({ title }) {
-      const _id = new fastify.mongo.ObjectId();
-      const now = new Date();
-
-      const { insertedId } = await todos.insertOne({
-        _id,
-        title,
-        done: false,
-        createdAt: now,
-        modifiedAt: now
-      });
-
-      return insertedId;
-    },
-    async listTodo({ skip, limit, title }) {
-      const filter = title ? { title: new RegExp(title, 'i') } : {};
-      const data = await todos.find(filter, { limit, skip }).toArray();
-      const totalCount = await todos.countDocuments(filter);
-      return { data, totalCount };
-    },
-    async readTodo({ id }) {
-      const todo = await todos.findOne(
-        { _id: fastify.mongo.ObjectId.createFromHexString(id) },
-        { projection: { _id: 0 } }
-      );
-
-      return todo;
-    },
-    async updateTodo({ id, data: newData }) {
-      const res = await todos.updateOne(
-        {
-          _id: fastify.mongo.ObjectId.createFromHexString(id)
-        },
-        {
-          $set: {
-            ...newData,
-            modifiedAt: new Date()
-          }
+  fastify.decorateRequest('todosDataSource', null); // Trigger speed-optimization
+  fastify.addHook('onRequest', async (request, _reply) => {
+    request.todosDataSource = {
+      async countTodos(filter = {}) {
+        filter.userId = request.user.id;
+        const totalCount = await todos.countDocuments(filter);
+        return totalCount;
+      },
+      async listTodos({
+        filter = {},
+        projection = {},
+        skip = 0,
+        limit = 50,
+        asStream = false
+      } = {}) {
+        if (filter.title) {
+          filter.title = new RegExp(filter.title, 'i');
+        } else {
+          delete filter.title;
         }
-      );
+        filter.userId = request.user.id;
 
-      return res.modifiedCount;
-    },
-    async deleteTodo({ id }) {
-      const res = await todos.deleteOne({
-        _id: fastify.mongo.ObjectId.createFromHexString(id)
-      });
+        const cursor = todos.find(filter, {
+          projection: { ...projection, _id: 0 },
+          limit,
+          skip
+        });
 
-      return res.deletedCount;
-    },
-    async changeStatus({ id, status }) {
-      const done = status === 'done';
-      const res = await todos.updateOne(
-        {
-          _id: fastify.mongo.ObjectId.createFromHexString(id)
-        },
-        {
-          $set: {
-            done,
-            modifiedAt: new Date()
-          }
+        if (asStream) {
+          return cursor.stream();
         }
-      );
 
-      return res.modifiedCount;
-    }
+        return cursor.toArray();
+      },
+      async createTodo({ title }) {
+        const _id = new fastify.mongo.ObjectId();
+        const now = new Date();
+        const userId = request.user.id;
+        const { insertedId } = await todos.insertOne({
+          _id,
+          userId,
+          title,
+          done: false,
+          id: _id,
+          createdAt: now,
+          modifiedAt: now
+        });
+        return insertedId;
+      },
+      async createTodos(todoList) {
+        const now = new Date();
+        const userId = request.user.id;
+        const toInsert = todoList.map((rawTodo) => {
+          const _id = new fastify.mongo.ObjectId();
+
+          return {
+            _id,
+            userId,
+            ...rawTodo,
+            id: _id,
+            createdAt: now,
+            modifiedAt: now
+          };
+        });
+        await todos.insertMany(toInsert);
+        return toInsert.map((todo) => todo._id);
+      },
+      async readTodo(id, projection = {}) {
+        const todo = await todos.findOne(
+          { _id: new fastify.mongo.ObjectId.createFromHexString(id), userId: request.user.id },
+          { projection: { ...projection, _id: 0 } }
+        );
+        return todo;
+      },
+      async updateTodo(id, newTodo) {
+        return todos.updateOne(
+          { _id: new fastify.mongo.ObjectId.createFromHexString(id), userId: request.user.id },
+          {
+            $set: {
+              ...newTodo,
+              modifiedAt: new Date()
+            }
+          }
+        );
+      },
+      async deleteTodo(id) {
+        return todos.deleteOne({
+          _id: new fastify.mongo.ObjectId.createFromHexString(id),
+          userId: request.user.id
+        });
+      }
+    };
   });
 });
