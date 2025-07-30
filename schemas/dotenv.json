@@ -13,6 +13,13 @@
     },
     "MONGO_URL": {
       "type": "string"
+    },
+    "JWT_SECRET": {
+      "type": "string"
+    },
+    "JWT_EXPIRE_IN": {
+      "type": "string",
+      "default": "1h"
     }
   }
 }
